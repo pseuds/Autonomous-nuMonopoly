@@ -1,5 +1,6 @@
 from dice import Dices
 from properties import Property, Utility, Transport
+import sys
 
 class Player:
 
@@ -100,6 +101,17 @@ class Player:
         print(f'Current position: {self.current_pos} - {board.get_name_pos(self.current_pos)}')
         if self.jailed_bool == True:
             print(f"{self.name} is in jail.")
+            while not self.can_pay(board.jail_bail):
+                if self.jailed_len_count == self.max_jail_len:
+                    print(f"{self.name} have stayed for the maximum jail length. They have been kicked from the game.")
+                    bankrupt_bool = self.pay_up_else_sell(board.get_tile(self.current_pos), sys.maxsize, board)
+                    return True
+                else:
+                    broke_bool = self.pay_up_else_sell(board.get_tile(self.current_pos), board.jail_bail, board)
+                    if broke_bool: 
+                        print(f"{self.name} cannot afford the bail. Their turn has been skipped.")
+                        self.jailed_len_count = self.jailed_len_count + 1
+                        return False
             if self.can_pay(board.jail_bail):
                 self.jailed_bool = False
                 self.jailed_len_count = 0
@@ -107,14 +119,7 @@ class Player:
                 self.wallet = self.wallet - board.jail_bail
                 print(f"{self.name} paid ${board.jail_bail} to get out of jail.")
                 print(f"{self.name}'s wallet: ${old_wallet} --> ${self.wallet}")
-            else:
-                if self.jailed_len_count == self.max_jail_len:
-                    print(f"{self.name} have stayed for the maximum jail length. They have been kicked from the game.")
-                    return True
-                else:
-                    print(f"{self.name} cannot afford the bail. Their turn has been skipped.")
-                    self.jailed_len_count = self.jailed_len_count + 1
-                    return bankrupt_bool
+                
         while True:
             d = Dices()
             d_vals = d.dice_values
@@ -162,11 +167,11 @@ class Player:
                 # if owner is others
                 else:
                     if isinstance(current_tile, Property):
-                        bankrupt_bool = self.pay_up_else_sell(current_tile, current_tile.rentvalue)
+                        bankrupt_bool = self.pay_up_else_sell(current_tile, current_tile.rentvalue,board)
                     elif isinstance(current_tile, Utility):
-                        bankrupt_bool = self.pay_up_else_sell(current_tile, current_tile.utilities_rentvalue(dice_values, current_tile.owner.prop_type_count(Utility)))
+                        bankrupt_bool = self.pay_up_else_sell(current_tile, current_tile.utilities_rentvalue(dice_values, current_tile.owner.prop_type_count(Utility)),board)
                     elif isinstance(current_tile, Transport):
-                        bankrupt_bool = self.pay_up_else_sell(current_tile, current_tile.transport_rentvalue(current_tile.owner.prop_type_count(Transport)))
+                        bankrupt_bool = self.pay_up_else_sell(current_tile, current_tile.transport_rentvalue(current_tile.owner.prop_type_count(Transport)),board)
         elif current_tile == 'Go To Jail':
             self.jailed_bool = True
             self.current_pos = 10
@@ -218,24 +223,34 @@ class Player:
         else:
             return True
 
-    def pay_up_else_sell(self, current_tile, rentvalue):
-        owner_of_tile = current_tile.owner
+    def pay_up_else_sell(self, current_tile, rentvalue, board):
+        if isinstance(current_tile, str): owner_of_tile = False
+        else: owner_of_tile = current_tile.owner
         bankrupt_bool = False
         while True:
             if self.can_pay(rentvalue):
                 old_wallet = self.wallet
-                receiver_old_wallet = owner_of_tile.wallet
-                self.to_pay_rent(rentvalue)
-                owner_of_tile.to_receive_rent(rentvalue)
-                print(f'{self.name} paid ${rentvalue} to {owner_of_tile.name}.')
-                print(f"{self.name}'s wallet: ${old_wallet} --> ${self.wallet}")
-                print(f"{owner_of_tile.name}'s wallet: ${receiver_old_wallet} --> ${owner_of_tile.wallet}")
-                break
-            else:
-                print(f"{self.name} cannot afford to pay the rent. \n{self.name}'s wallet: ${self.wallet}, Rent: ${rentvalue}")
-                bankrupt_bool = self.to_sell()
-                if bankrupt_bool == True:
+                if owner_of_tile != False:
+                    receiver_old_wallet = owner_of_tile.wallet
+                    self.to_pay_rent(rentvalue)
+                    owner_of_tile.to_receive_rent(rentvalue)
+                    print(f'{self.name} paid ${rentvalue} to {owner_of_tile.name}.')
+                    print(f"{self.name}'s wallet: ${old_wallet} --> ${self.wallet}")
+                    print(f"{owner_of_tile.name}'s wallet: ${receiver_old_wallet} --> ${owner_of_tile.wallet}")
+                    return False
+                else:
                     break
+            else:
+                if owner_of_tile != False:
+                    print(f"{self.name} cannot afford to pay the rent. \n{self.name}'s wallet: ${self.wallet}, Rent: ${rentvalue}")
+                    bankrupt_bool = self.to_sell()
+                    if bankrupt_bool == True:
+                        break
+                else:
+                    print(f"{self.name} cannot afford to pay the bail. \n{self.name}'s wallet: ${self.wallet}, Bail: ${board.jail_bail}")
+                    bankrupt_bool = self.to_sell()
+                    if bankrupt_bool == True:
+                        break
         return bankrupt_bool
 
     def to_pay_rent(self, rent):

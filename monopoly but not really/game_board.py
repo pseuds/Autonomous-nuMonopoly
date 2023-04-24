@@ -104,13 +104,13 @@ class Game:
             else:
                 print('Invalid input. Please only input numbers between 2 to 40.')
                 
+        f = open('names.txt', 'r')
+        s = f.read()
+        namels = s.split('\n')
 
         for n in range(no_of_players):
             while True:
                 # inp_name = input(f"Player {n+1}'s name: \n>>")
-                f = open('names.txt', 'r')
-                s = f.read()
-                namels = s.split('\n')
                 inp_name = random.choice(namels)
                 if self.check_valid_name(inp_name) == True:
                     self.add_to_player_list(Player(inp_name, self.board.max_pos))
